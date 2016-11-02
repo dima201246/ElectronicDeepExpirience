@@ -96,12 +96,12 @@
 				TCCR0A	|= ((value == 0 ? 0 : 1) << COM0B1);	// Неинвертирующий режим
 			}
 
-			if ((!bit_seted(TCCR0A, COM0A1)) && (!bit_seted(TCCR0A, COM0B1))) { // Отключение таймера, если два пина в нуле
+			if ((!bit_seted(TCCR0A, COM0A1)) && (!bit_seted(TCCR0A, COM0B1))) {	// Отключение таймера, если два пина в нуле
 				TCCR0A	|= (0 << WGM00) | (0 << WGM01) ;
 				TCCR0B	|= (0 << CS00) | (0 << CS01) | (0 << CS02);				
 			} else {
-				TCCR0A	|= (1 << WGM01) | (1 << WGM00);		// Режим fast PWM
-				TCCR0B	|= (1 << CS01);						// Пределитель на 8
+				TCCR0A	|= (1 << WGM01) | (1 << WGM00);			// Режим fast PWM
+				TCCR0B	|= (1 << CS01);							// Пределитель на 8
 			}
 		} else if (((ioAddr == &PORTB) && (pinNum == 1)) || ((ioAddr == &PORTB) && (pinNum == 2))) {	// 9 и 10 цифровые пины
 			if (pinNum == 1) {
@@ -114,12 +114,12 @@
 				TCCR1A	|= ((value == 0 ? 0 : 1) << COM1B1);	// Неинвертирующий режим
 			}
 
-			if ((!bit_seted(TCCR1A, COM1A1)) && (!bit_seted(TCCR1A, COM1B1))) { // Отключение таймера, если два пина в нуле
+			if ((!bit_seted(TCCR1A, COM1A1)) && (!bit_seted(TCCR1A, COM1B1))) {	// Отключение таймера, если два пина в нуле
 				TCCR1A	|= (0 << WGM10) | (0 << WGM11) ;
 				TCCR1B	|= (0 << CS10) | (0 << CS11) | (0 << CS12);				
 			} else {
-				TCCR1A	|= (1 << WGM11) | (1 << WGM10);		// Режим fast PWM
-				TCCR1B	|= (1 << CS11);						// Пределитель на 8
+				TCCR1A	|= (1 << WGM11) | (1 << WGM10);			// Режим fast PWM
+				TCCR1B	|= (1 << CS11);							// Пределитель на 8
 			}
 		} else if (((ioAddr == &PORTB) && (pinNum == 3)) || ((ioAddr == &PORTD) && (pinNum == 3))) {	// 3 и 12 цифровые пины
 			if (ioAddr == &PORTB) {
@@ -132,12 +132,12 @@
 				TCCR2A	|= ((value == 0 ? 0 : 1) << COM2B1);	// Неинвертирующий режим
 			}
 
-			if ((!bit_seted(TCCR2A, COM2A1)) && (!bit_seted(TCCR2A, COM2B1))) { // Отключение таймера, если два пина в нуле
+			if ((!bit_seted(TCCR2A, COM2A1)) && (!bit_seted(TCCR2A, COM2B1))) {	// Отключение таймера, если два пина в нуле
 				TCCR2A	|= (0 << WGM20) | (0 << WGM21) ;
 				TCCR2B	|= (0 << CS20) | (0 << CS21) | (0 << CS22);				
 			} else {
-				TCCR2A	|= (1 << WGM21) | (1 << WGM20);		// Режим fast PWM
-				TCCR2B	|= (1 << CS21);						// Пределитель на 8
+				TCCR2A	|= (1 << WGM21) | (1 << WGM20);			// Режим fast PWM
+				TCCR2B	|= (1 << CS21);							// Пределитель на 8
 			}
 		}
 	}
@@ -146,7 +146,7 @@
 	void ADC_Init(void) {
 		ADCSRA	|= (1 << ADEN)					// Включаем АЦП
 				|(1 << ADPS1) | (1 << ADPS0);	// Пределитель на 8
-		ADMUX	|= (1 << REFS1) | (1 << REFS0);	// Опорное напряжение - внутренние 1.1 вольта (Нужен конденсатор на AREF)
+		ADMUX	|= (1 << REFS0) | (0 << REFS1);	// Опорное напряжение VCC
 	}
 
 	uint16_t analogRead(volatile uint8_t *ioAddr, uint8_t pinNum) {
