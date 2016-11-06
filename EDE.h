@@ -3,6 +3,7 @@
 
 	#include <avr/io.h>
 	#include <util/delay.h>
+	#include <avr/interrupt.h>
 
 	#define OUTPUT	1
 	#define INPUT	0
@@ -15,8 +16,10 @@
 	#define unset_bit(m,b)	((m) &= ~(1 << b))
 	#define bit_seted(m,b)	((m) & (1 << b))
 	#define digitalWrite(m,b)	pinMode(m, b)
+	#define delay(d)		_delay_ms(d)
+	#define delay_s(d)		_delay_ms((d * 1000))
 
-	// #if defined(__AVR_ATmega328__)
+	#if defined(__AVR_ATmega328P__)
 		#define F_CPU 16000000UL
 
 		/*DIGITAL PINS*/
@@ -68,7 +71,7 @@
 		#define APIN5		&PORTC, 5
 		#define APIN6		&PORTC, 6
 		#define APIN6		&PORTC, 7
-	// #endif
+	#endif
 
 	void pinMode(volatile uint8_t *ioAddr, uint8_t pinNum, uint8_t pinMode) {
 		if (pinMode) {
@@ -82,6 +85,7 @@
 		return ((1 << pinNum) == ((*ioAddr) & (1 << pinNum)));
 	}
 
+	/*ШИМ Начало*/
 	void analogWrite(volatile uint8_t *ioAddr, uint8_t pinNum, uint8_t value) {
 		// unset_bit(*ioAddr, pinNum);
 
@@ -141,6 +145,7 @@
 			}
 		}
 	}
+	/*ШИМ Конец*/
 
 	/*АЦП Начало*/
 	void ADC_Init(void) {
@@ -158,4 +163,28 @@
 		return (ADCL | ADCH << 8);
 	}
 	/*АЦП Конец*/
+
+	/*EEPROM Начало*/
+	void WriteDataEEPROM(void *iData, uint8_t byte_adress) {
+		uint8_t		*byte_Data	= (uint8_t *) iData;
+		uint16_t	DataSize	= sizeof(iData),
+					block		= 0;
+
+		for(block	= 0; block < DataSize; block++) {
+			eeprom_write_byte(block + byte_adress, *byte_Data);
+			byte_Data++;
+		}
+	}
+
+	void ReadDataEEPROM(void *iData, uint8_t byte_adress) {
+		uint8_t		*byte_Data	= (uint8_t *) iData;
+		uint16_t	DataSize	= sizeof(iData),
+					block		= 0;
+
+		for(block	= 0; block < DataSize; block++) {
+			*byte_Data = eeprom_read_byte(block + byte_adress);
+			byte_Data++;
+		}
+	}
+	/*EEPROM Конец*/
 #endif
