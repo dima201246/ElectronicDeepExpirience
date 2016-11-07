@@ -165,9 +165,11 @@
 	/*АЦП Конец*/
 
 	/*EEPROM Начало*/
-	void WriteDataEEPROM(void *iData, uint8_t byte_adress) {
-		uint8_t		*byte_Data	= (uint8_t *) iData;
-		uint16_t	DataSize	= sizeof(iData),
+	#define WriteDataEEPROM(iD, ba)	WriteDataEEPROM_Sized(iD, ba, sizeof(*iD));
+	#define ReadDataEEPROM(iD, ba)	ReadDataEEPROM_Sized(iD, ba, sizeof(*iD));
+
+	void WriteDataEEPROM_Sized(void *iData, uint8_t byte_adress, uint8_t DataSize) {
+		uint8_t		*byte_Data	= (uint8_t *) iData,
 					block		= 0;
 
 		for(block	= 0; block < DataSize; block++) {
@@ -176,9 +178,8 @@
 		}
 	}
 
-	void ReadDataEEPROM(void *iData, uint8_t byte_adress) {
-		uint8_t		*byte_Data	= (uint8_t *) iData;
-		uint16_t	DataSize	= sizeof(iData),
+	void ReadDataEEPROM_Sized(void *iData, uint8_t byte_adress, uint8_t DataSize) {
+		uint8_t		*byte_Data	= (uint8_t *) iData,
 					block		= 0;
 
 		for(block	= 0; block < DataSize; block++) {
