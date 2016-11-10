@@ -17,6 +17,11 @@
 	#define unset_bit(m,b)	((m) &= ~(1 << b))
 	#define bit_seted(m,b)	((m) & (1 << b))
 
+	#define bit_first_part(m,b)			((m) = (b))
+	#define bit_second_part(m,b)		((m) |= ((b) << 4))
+	#define bit_read_first_part(m) 		((m) & 0x0F)
+	#define bit_read_second_part(m) 	(((m) & 0xF0) >> 4)
+
 	#define digitalWrite(m,b)	pinMode(m, b)
 	#define delay_u(d)			_delay_us(d)
 	#define delay(d)			_delay_ms(d)
@@ -64,7 +69,7 @@
 		#define INIT_APIN4	&DDRC, 4
 		#define INIT_APIN5	&DDRC, 5
 		#define INIT_APIN6	&DDRC, 6
-		#define INIT_APIN6	&DDRC, 7
+		#define INIT_APIN7	&DDRC, 7
 
 		#define APIN0		&PORTC, 0
 		#define APIN1		&PORTC, 1
@@ -73,7 +78,7 @@
 		#define APIN4		&PORTC, 4
 		#define APIN5		&PORTC, 5
 		#define APIN6		&PORTC, 6
-		#define APIN6		&PORTC, 7
+		#define APIN7		&PORTC, 7
 	// #endif
 
 	void pinMode(volatile uint8_t *ioAddr, uint8_t pinNum, uint8_t pinMode) {
@@ -179,7 +184,7 @@
 					block		= 0;
 
 		for(block	= 0; block < DataSize; block++) {
-			eeprom_write_byte(block + byte_adress, *byte_Data);
+			eeprom_write_byte((uint8_t*)(block + byte_adress), *byte_Data);
 			byte_Data++;
 		}
 	}
@@ -189,7 +194,7 @@
 					block		= 0;
 
 		for(block	= 0; block < DataSize; block++) {
-			*byte_Data = eeprom_read_byte(block + byte_adress);
+			*byte_Data = eeprom_read_byte((uint8_t*)(block + byte_adress));
 			byte_Data++;
 		}
 	}
