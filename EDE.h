@@ -77,8 +77,11 @@
 	// #endif
 
 	void pinMode(volatile uint8_t *ioAddr, uint8_t pinNum, uint8_t pinMode) {
-		pinMode = (pinMode & 1);
-		*ioAddr = (*ioAddr & ~(1 << pinNum)) | (1 << pinMode);
+		if (pinMode) {
+			*ioAddr	|= (1 << pinNum);
+		} else {
+			*ioAddr	&= ~(1 << pinNum);
+		}
 	}
 
 	uint8_t digitalRead (volatile uint8_t *ioAddr, uint8_t pinNum) {
