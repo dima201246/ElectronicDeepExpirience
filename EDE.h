@@ -4,6 +4,7 @@
 	#include <avr/io.h>
 	#include <util/delay.h>
 	#include <avr/interrupt.h>
+	#include <avr/eeprom.h>
 
 	#define OUTPUT	1
 	#define INPUT	0
@@ -15,11 +16,13 @@
 	#define set_bit(m,b)	((m) |= (1 << b))
 	#define unset_bit(m,b)	((m) &= ~(1 << b))
 	#define bit_seted(m,b)	((m) & (1 << b))
-	#define digitalWrite(m,b)	pinMode(m, b)
-	#define delay(d)		_delay_ms(d)
-	#define delay_s(d)		_delay_ms((d * 1000))
 
-	#if defined(__AVR_ATmega328P__)
+	#define digitalWrite(m,b)	pinMode(m, b)
+	#define delay_u(d)			_delay_us(d)
+	#define delay(d)			_delay_ms(d)
+	#define delay_s(d)			_delay_ms(d * 1000)
+
+	// #if defined(__AVR_ATmega328P__) || defined(__AVR_ATmega168__)
 		#define F_CPU 16000000UL
 
 		/*DIGITAL PINS*/
@@ -71,7 +74,7 @@
 		#define APIN5		&PORTC, 5
 		#define APIN6		&PORTC, 6
 		#define APIN6		&PORTC, 7
-	#endif
+	// #endif
 
 	void pinMode(volatile uint8_t *ioAddr, uint8_t pinNum, uint8_t pinMode) {
 		if (pinMode) {
@@ -82,7 +85,10 @@
 	}
 
 	uint8_t digitalRead (volatile uint8_t *ioAddr, uint8_t pinNum) {
-		return ((1 << pinNum) == ((*ioAddr) & (1 << pinNum)));
+		if (ioAddr != &PORTC)
+			return ((*ioAddr) & (1 << pinNum));
+		else
+			return ((PINC) & (1 << pinNum));
 	}
 
 	/*ШИМ Начало*/
@@ -150,7 +156,7 @@
 	/*АЦП Начало*/
 	void ADC_Init(void) {
 		ADCSRA	|= (1 << ADEN)					// Включаем АЦП
-				|(1 << ADPS1) | (1 << ADPS0);	// Пределитель на 8
+				| (1 << ADPS1) | (1 << ADPS0);	// Пределитель на 8
 		ADMUX	|= (1 << REFS0) | (0 << REFS1);	// Опорное напряжение VCC
 	}
 
@@ -165,7 +171,7 @@
 	/*АЦП Конец*/
 
 	/*EEPROM Начало*/
-	#define WriteDataEEPROM(iD, ba)	WriteDataEEPROM_Sized(iD, ba, sizeof(*iD));
+	#define WriteDataEEPROM(iD, ba)	WriteDataEEPROM_SizedT(iD, ba, sizeof(*iD));
 	#define ReadDataEEPROM(iD, ba)	ReadDataEEPROM_Sized(iD, ba, sizeof(*iD));
 
 	void WriteDataEEPROM_Sized(void *iData, uint8_t byte_adress, uint8_t DataSize) {
