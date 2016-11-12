@@ -89,10 +89,16 @@
 		}
 	}
 
-	uint8_t digitalRead (volatile uint8_t *ioAddr, uint8_t pinNum) {
-		if (ioAddr != &PORTC)
-			return ((*ioAddr) & (1 << pinNum));
-		else
+	uint8_t PORT_Read(volatile uint8_t *ioAddr, uint8_t pinNum) {
+		return ((*ioAddr) & (1 << pinNum));
+	}
+
+	uint8_t PIN_Read(volatile uint8_t *ioAddr, uint8_t pinNum) {
+		if (ioAddr == &PORTB) {
+			return ((PINB) & (1 << pinNum));
+		} else if (ioAddr == &PORTD) {
+			return ((PIND) & (1 << pinNum));
+		} else
 			return ((PINC) & (1 << pinNum));
 	}
 
