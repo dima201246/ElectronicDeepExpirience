@@ -24,6 +24,9 @@
 	#define bit_read_first_part(m) 		((m) & 0x0F)
 	#define bit_read_second_part(m) 	(((m) & 0xF0) >> 4)
 
+	#define byte_to_analog(x)	((int)(4.015 * x))
+	#define analog_to_byte(x)	((byte)(0.248 * x))
+
 	#define digitalWrite(m,b)	pinMode(m, b)
 	#define delay_u(d)			_delay_us(d)
 	#define delay(d)			_delay_ms(d)
@@ -166,7 +169,7 @@
 	/*ШИМ Конец*/
 
 	/*АЦП Начало*/
-	void ADC_Init(void) {
+	void ADC_Init() {
 		ADCSRA	|= (1 << ADEN)					// Включаем АЦП
 				| (1 << ADPS1) | (1 << ADPS0);	// Пределитель на 8
 		ADMUX	|= (1 << REFS0);				// Опорное напряжение VCC
@@ -184,8 +187,8 @@
 	/*АЦП Конец*/
 
 	/*EEPROM Начало*/
-	#define WriteDataEEPROM(iD, ba)	WriteDataEEPROM_SizedT(iD, ba, sizeof(*iD));
-	#define ReadDataEEPROM(iD, ba)	ReadDataEEPROM_Sized(iD, ba, sizeof(*iD));
+	#define WriteDataEEPROM(iD, ba)	WriteDataEEPROM_Sized(&iD, ba, sizeof(iD));
+	#define ReadDataEEPROM(iD, ba)	ReadDataEEPROM_Sized(&iD, ba, sizeof(iD));
 
 	void WriteDataEEPROM_Sized(void *iData, uint8_t byte_adress, uint8_t DataSize) {
 		uint8_t		*byte_Data	= (uint8_t *) iData,
