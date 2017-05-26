@@ -165,7 +165,7 @@
 	{
 		c -= 32;
 
-		for (uint8_t line = 0; line < 6; line++)
+		for (uint8_t line = 0; line <= 6; line++)
 			LCD_write_byte(fontEng[c][line], 0);
 	}
 
@@ -182,7 +182,21 @@
 		while (*s)
 		{
 			LCD_write_char(*s);
+
 			s++;
+		}
+	}
+
+	void LCD_print_int(uint8_t X, uint8_t Y, int16_t s)
+	{
+		LCD_set_XY(X,Y);
+
+		while (s != 0)
+		{
+
+			for (uint8_t line = 0; line <= 6; line++)
+				LCD_write_byte(fontEng[((s % 10) + 16)][line], 0);
+			s /= 10;
 		}
 	}
 #endif
