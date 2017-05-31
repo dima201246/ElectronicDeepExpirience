@@ -19,9 +19,6 @@ uint8_t twi_tx_buff[TWI_TX_BUFFSIZE];
 uint8_t twi_rxrd, twi_rxwr;
 uint8_t twi_rx_buff[TWI_RX_BUFFSIZE];
 
-/* Current slave address */
-uint8_t slave_address;
-
 #define buff_empty(_a)\
 		(twi_##_a##xrd == twi_##_a##xwr)
 
@@ -86,6 +83,13 @@ uint8_t twi_get_rx_byte()
 #define twi_transmit_stop() \
 	do {setmask(TWCR, _BV(TWINT) | _BV(TWSTO) | _BV(TWEN));}while(0)\
 
+#define twi_transmit_data(_data) \
+	do {\
+		TWDR = (_data);\
+		clearmask(TWCR, _BV(TWSTA) | _BV(TWSTO));\
+		setmask(TWCR, _BV(TWEN) | _BV(TWINT));\
+	} while(0)\
+
 #ifdef DEBUG
 void twi_status_print()
 {
@@ -94,45 +98,6 @@ void twi_status_print()
 	USART_Transmit('\n');
 }
 #endif
-
-// Main TWI interrupt handler
-ISR(TWI_vect)
-{
-#ifdef DEBUG
-	twi_status_print();
-#endif
-	switch(TW_STATUS)
-	{
-	/* START condition has begin transmitted
-	 * We should load sla_w or sla_r
-	 */
-	case TW_START:
-	case TW_REP_START:
-			TWDR = slave_address;
-			setmask(TWCR, _BV(TWINT) | _BV(TWEN));
-		break;
-
-	case TW_MT_SLA_ACK:			/*  SLA+W transmitted, ACK received */
-	case TW_MT_DATA_ACK:		/* data transmitted, ACK received */
-		if(!buff_empty(t)) {
-			TWDR = twi_get_tx_byte();
-			clearmask(TWCR, _BV(TWSTA) | _BV(TWSTO));
-			setmask(TWCR, _BV(TWEN) | _BV(TWINT));
-		} else {
-			twi_transmit_stop();
-		}
-		break;
-
-	case TW_MT_DATA_NACK:
-		twi_txrd = twi_txwr;
-		twi_transmit_stop();
-		break;
-
-	/* Bus was broken? FUCK! */
-	case TW_BUS_ERROR:
-		break;
-	}
-}
 
 int8_t twi_init()
 {
@@ -200,3 +165,140 @@ void twi_error(uint8_t code)
 	USART_Transmit('\n');
 #endif
 }
+
+/* ----------------- Experimental section ------------------ */
+
+#define TASK_ERR 0xEE
+
+uint8_t *tx_buff, tx_buff_size;
+uint8_t *rx_buff, rx_buff_size;
+
+uint8_t tx_wr, rx_wr;
+
+uint8_t curr_task[16], curr_act_num, curr_task_len;
+
+/* Current slave address */
+uint8_t slave_address;
+
+void do_nothing()
+{
+}
+
+twi_onaction_t on_act_handler = do_nothing;
+
+void twi_startaction(enum action task[], uint8_t len)
+{
+	curr_task_len = len;
+	memcpy(curr_task, task, len);
+
+	curr_act_num = 0;
+	tx_wr = rx_wr = 0;
+
+	twi_transmit_start();
+}
+
+void twi_set_txbuff(uint8_t *buff, uint8_t len)
+{
+	tx_buff = buff;
+	tx_buff_size = len;
+}
+
+void twi_set_rxbuff(uint8_t *buff, uint8_t len)
+{
+	rx_buff = buff;
+	rx_buff_size = len;
+}
+
+void twi_set_on_action(twi_onaction_t handler)
+{
+	on_act_handler = handler;
+}
+
+void twi_setsla(uint8_t sla)
+{
+	slave_address = sla << 1;
+}
+
+// Main TWI interrupt handler
+ISR(TWI_vect)
+{
+#ifdef DEBUG
+	twi_status_print();
+#endif
+
+	if (curr_act_num >= curr_task_len)
+	{
+		twi_error(TASK_ERR);
+		curr_act_num = curr_task_len = 0;
+		twi_transmit_stop();
+	}
+
+	switch(TW_STATUS)
+	{
+	/* START condition has begin transmitted
+	 * We should load sla_w or sla_r
+	 */
+	case TW_START:
+	case TW_REP_START:
+			TWDR = (curr_task[curr_act_num++] == SLA_R) ?
+						slave_address | TW_READ :
+						slave_address | TW_WRITE;
+			setmask(TWCR, _BV(TWINT) | _BV(TWEN));
+		break;
+
+	case TW_MT_SLA_ACK:			/*  SLA+W transmitted, ACK received */
+	case TW_MT_DATA_ACK:		/* data transmitted, ACK received */
+			switch(curr_task[curr_act_num])
+			{
+				case SR:
+						++curr_act_num;
+						twi_transmit_start();
+					break;
+				case DT_1:
+						twi_transmit_data(tx_buff[tx_wr++]);
+						++curr_act_num;
+					break;
+				case DT_N:
+						twi_transmit_data(tx_buff[tx_wr++]);
+						if (tx_wr == tx_buff_size)
+							++curr_act_num;
+					break;
+
+				case DR_N:
+					break;
+
+				case ON_ACT:
+						on_act_handler();
+						++curr_act_num;
+					break;
+			}
+
+			if (curr_act_num == curr_task_len)
+				twi_transmit_stop();
+		break;
+
+	case TW_MT_DATA_NACK:
+		twi_txrd = twi_txwr;
+		twi_transmit_stop();
+		break;
+
+	/* Bus was broken? FUCK! */
+	case TW_BUS_ERROR:
+		break;
+	}
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

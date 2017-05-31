@@ -38,14 +38,18 @@ typedef	uint16_t twihdl_t;
 int8_t twi_init();
 void twi_send(uint8_t sla, uint8_t *data, uint8_t size);
 
-/* Experemental section */
+/* Experimental section */
 
-typedef void twi_onaction();
-enum action { SR, SLA_R, SLA_W, D_1, D_N, ONACT };
+#include <string.h>
+
+typedef void twi_onaction_t();
+enum action { SR, SLA_R, SLA_W, DT_1, DR_N, DT_N, ON_ACT };
 enum mode { MASTER, SLAVE };
 
-void twi_startaction(enum action[], uint8_t len);
-void twi_setbuff(uint8_t *buff, uint8_t len);
+void twi_startaction(enum action task[], uint8_t len);
+void twi_set_txbuff(uint8_t *buff, uint8_t len);
+void twi_set_rxbuff(uint8_t *buff, uint8_t len);
+void twi_set_on_action(twi_onaction_t handler);
 void twi_setsla(uint8_t sla);
 void twi_setmode(enum mode);
 
