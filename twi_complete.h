@@ -8,6 +8,7 @@
 #ifndef TWI_COMPLETE_H_
 #define TWI_COMPLETE_H_
 
+#include <util/twi.h>
 #include "myutils.h"
 
 #ifdef DEBUG
@@ -34,13 +35,18 @@
 
 
 typedef	uint16_t twihdl_t;
-typedef void twi_onrecive(uint8_t *buff, uint8_t size);
-
-#include <util/twi.h>
-
 int8_t twi_init();
-
 void twi_send(uint8_t sla, uint8_t *data, uint8_t size);
-twihdl_t twi_recv(uint8_t sla, uint8_t size);
+
+/* Experemental section */
+
+typedef void twi_onaction();
+enum action { SR, SLA_R, SLA_W, D_1, D_N, ONACT };
+enum mode { MASTER, SLAVE };
+
+void twi_startaction(enum action[], uint8_t len);
+void twi_setbuff(uint8_t *buff, uint8_t len);
+void twi_setsla(uint8_t sla);
+void twi_setmode(enum mode);
 
 #endif /* TWI_COMPLETE_H_ */
