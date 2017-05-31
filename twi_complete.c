@@ -9,71 +9,9 @@
 
 #include "twi_complete.h"
 
-#define TWI_TX_BUFFEND		(TWI_TX_BUFFSIZE-1)
-#define TWI_RX_BUFFEND		(TWI_RX_BUFFSIZE-1)
-
-/* Define ring buffers */
-uint8_t twi_txrd, twi_txwr;
-uint8_t twi_tx_buff[TWI_TX_BUFFSIZE];
-
-uint8_t twi_rxrd, twi_rxwr;
-uint8_t twi_rx_buff[TWI_RX_BUFFSIZE];
-
-#define buff_empty(_a)\
-		(twi_##_a##xrd == twi_##_a##xwr)
-
-#define buff_free_len(_a, _buff)\
-		((twi_##_a##xwr < twi_##_a##xrd) ? \
-			(twi_##_a##xrd - twi_##_a##xwr + 1) : \
-			(_buff##SIZE - (twi_##_a##xwr - twi_##_a##xrd)))\
-
-#define GET_RXRD(handle)	((handle >> 8) & 0xFF)
-#define GET_RXWR(handle)	((handle) & 0xFF)
-
-#define SET_RXRDWR(handle)	(handle = (twihdl_t) ((twi_rxrd << 8) | (twi_rxwr)))
-
 /* error handler */
 void twi_error(uint8_t code);
 
-void twi_load_tx_buff(uint8_t *data, uint8_t count)
-{
-	// if we have some place to write
-	for(; count > 0; --count) {
-		if (((twi_txwr+1) & TWI_TX_BUFFEND) != twi_txrd) {
-			twi_tx_buff[twi_txwr++] = *data++;
-			twi_txwr &= TWI_TX_BUFFEND;
-		} else
-			return;
-	}
-}
-
-uint8_t twi_get_tx_byte()
-{
-	/* empty buffer */
-	if(buff_empty(t)) {
-		twi_error(TWI_BUFF_EMPTY);
-		return TWI_BUFF_EMPTY;
-	}
-
-	uint8_t byte = twi_tx_buff[twi_txrd++];
-	twi_txrd &= TWI_TX_BUFFEND;
-
-	return byte;
-}
-
-uint8_t twi_get_rx_byte()
-{
-	/* empty buffer */
-	if(buff_empty(r)) {
-		twi_error(TWI_BUFF_EMPTY);
-		return TWI_BUFF_EMPTY;
-	}
-
-	uint8_t byte = twi_rx_buff[twi_rxrd++];
-	twi_rxrd &= TWI_RX_BUFFEND;
-
-	return byte;
-}
 
 // transmit start condition
 #define twi_transmit_start() \
@@ -87,6 +25,20 @@ uint8_t twi_get_rx_byte()
 	do {\
 		TWDR = (_data);\
 		clearmask(TWCR, _BV(TWSTA) | _BV(TWSTO));\
+		setmask(TWCR, _BV(TWEN) | _BV(TWINT));\
+	} while(0)\
+
+#define twi_recv_ack(_to)\
+	do{\
+		(_to) = TWDR;\
+		clearmask(TWCR, _BV(TWSTA) | _BV(TWSTO));\
+		setmask(TWCR, _BV(TWEN) | _BV(TWINT) | _BV(TWEA));\
+	} while(0)\
+
+#define twi_recv_nack(_to)\
+	do{\
+		(_to) = TWDR;\
+		clearmask(TWCR, _BV(TWSTA) | _BV(TWSTO)| _BV(TWEA));\
 		setmask(TWCR, _BV(TWEN) | _BV(TWINT));\
 	} while(0)\
 
@@ -112,49 +64,9 @@ int8_t twi_init()
 	TWBR = 250;	// DEBUG
 	TWSR = 0;
 
-	/* clear pointers */
-	twi_txrd = twi_txwr = twi_rxrd = twi_rxwr = 0;
-
 	setbit(TWCR, TWIE);		// enable interrupts
 
 	return 0;
-}
-
-void twi_send(uint8_t sla, uint8_t *data, uint8_t size)
-{
-	/* Full address with direction bit */
-	uint8_t sla_w = (sla << 1) | TW_WRITE;
-
-	/* load slave address */
-	slave_address = sla_w;
-	twi_load_tx_buff(data, size);
-
-	twi_transmit_start();
-}
-
-twihdl_t twi_recv(uint8_t sla, uint8_t size)
-{
-	/* if we haven't any space in buffer -  error */
-	if(buff_free_len(r, TWI_RX_BUFF) < size) {
-		twi_error(TWI_BUFF_OVERFLOW);
-		return (twihdl_t) TWI_BUFF_OVERFLOW;
-	}
-
-	/* Full address with direction bit */
-	uint8_t sla_r = (sla << 1) | TW_READ;
-	twihdl_t handle;
-
-	/* load slave address */
-	slave_address = sla_r;
-
-	/* generate handle */
-	SET_RXRDWR(handle);
-
-	twi_rxwr = (twi_rxwr + size) & TWI_TX_BUFFEND;
-
-	twi_transmit_start();
-
-	return handle;
 }
 
 void twi_error(uint8_t code)
@@ -167,8 +79,6 @@ void twi_error(uint8_t code)
 }
 
 /* ----------------- Experimental section ------------------ */
-
-#define TASK_ERR 0xEE
 
 uint8_t *tx_buff, tx_buff_size;
 uint8_t *rx_buff, rx_buff_size;
@@ -186,7 +96,7 @@ void do_nothing()
 
 twi_onaction_t on_act_handler = do_nothing;
 
-void twi_startaction(enum action task[], uint8_t len)
+void twi_startaction(enum twi_action task[], uint8_t len)
 {
 	curr_task_len = len;
 	memcpy(curr_task, task, len);
@@ -228,63 +138,110 @@ ISR(TWI_vect)
 
 	if (curr_act_num >= curr_task_len)
 	{
-		twi_error(TASK_ERR);
 		curr_act_num = curr_task_len = 0;
 		twi_transmit_stop();
+		return;
+	}
+
+	if (curr_task[curr_act_num] == ON_ACT)
+	{
+		curr_act_num++;
+		on_act_handler();
 	}
 
 	switch(TW_STATUS)
 	{
-	/* START condition has begin transmitted
-	 * We should load sla_w or sla_r
-	 */
-	case TW_START:
-	case TW_REP_START:
-			TWDR = (curr_task[curr_act_num++] == SLA_R) ?
-						slave_address | TW_READ :
-						slave_address | TW_WRITE;
-			setmask(TWCR, _BV(TWINT) | _BV(TWEN));
-		break;
+		/*--------------- MASTER TRANSIVER MODE ---------------*/
 
-	case TW_MT_SLA_ACK:			/*  SLA+W transmitted, ACK received */
-	case TW_MT_DATA_ACK:		/* data transmitted, ACK received */
+		/* START condition has begin transmitted
+		 * We should load sla_w or sla_r
+		 */
+		case TW_START:
+		case TW_REP_START:
+				TWDR = (curr_task[curr_act_num++] == SLA_R) ?
+							slave_address | TW_READ :
+							slave_address | TW_WRITE;
+
+				setmask(TWCR, _BV(TWINT) | _BV(TWEN));
+			break;
+
+		case TW_MT_SLA_ACK:			/*  SLA+W transmitted, ACK received */
+		case TW_MT_DATA_ACK:		/* data transmitted, ACK received */
+				switch(curr_task[curr_act_num])
+				{
+					case SR:
+							curr_act_num++;
+							twi_transmit_start();
+						break;
+					case DT_1:
+							twi_transmit_data(tx_buff[tx_wr++]);
+							curr_act_num++;
+						break;
+					case DT_N:
+							twi_transmit_data(tx_buff[tx_wr++]);
+							if (tx_wr == tx_buff_size)
+								curr_act_num++;
+						break;
+				}
+			break;
+
+		/* Something is wrong */
+		case TW_MT_DATA_NACK:
+			twi_error(TW_MT_DATA_NACK);
+			curr_act_num = curr_task_len = 0;
+			twi_transmit_stop();
+			break;
+
+		case TW_MR_ARB_LOST:	/* Someone becomes to MASTER */
+			curr_act_num = 0;	/* repeat all */
+			twi_transmit_start();
+			break;
+
+		/*--------------- MASTER RECIVE MODE ---------------*/
+
+		case TW_MR_SLA_ACK:
+		case TW_MR_DATA_ACK:
 			switch(curr_task[curr_act_num])
 			{
-				case SR:
-						++curr_act_num;
-						twi_transmit_start();
-					break;
-				case DT_1:
-						twi_transmit_data(tx_buff[tx_wr++]);
-						++curr_act_num;
-					break;
-				case DT_N:
-						twi_transmit_data(tx_buff[tx_wr++]);
-						if (tx_wr == tx_buff_size)
-							++curr_act_num;
+				case DR_1:
+					if (rx_wr < rx_buff_size-1)
+					{
+						twi_recv_ack(rx_buff[rx_wr++]);
+					}
+					else
+					{
+						twi_recv_nack(rx_buff[rx_wr++]);
+					}
+
+					curr_act_num++;
 					break;
 
 				case DR_N:
-					break;
-
-				case ON_ACT:
-						on_act_handler();
-						++curr_act_num;
+					if (rx_wr >= rx_buff_size-1)
+					{
+						twi_recv_nack(rx_buff[rx_wr++]);
+						curr_act_num++;
+					}
+					else
+					{
+						twi_recv_ack(rx_buff[rx_wr++]);
+					}
 					break;
 			}
+			break;
 
-			if (curr_act_num == curr_task_len)
-				twi_transmit_stop();
-		break;
+		case TW_MR_DATA_NACK:
+			switch(curr_task[curr_act_num])
+			{
+				default:
+					twi_transmit_stop();
+					break;
+			}
+			break;
 
-	case TW_MT_DATA_NACK:
-		twi_txrd = twi_txwr;
-		twi_transmit_stop();
-		break;
-
-	/* Bus was broken? FUCK! */
-	case TW_BUS_ERROR:
-		break;
+		/* Bus was broken? FUCK! */
+		case TW_BUS_ERROR:
+			break;
 	}
 }
 

@@ -23,34 +23,30 @@
 
 #define TWI_MASTER_ADDR	0b1010000
 
-#define TWI_TX_BUFFSIZE	32		// Queue to send
-#define TWI_RX_BUFFSIZE	32		// size shall be a power of two (2, 4, 8, 16, etc)
-
 /*
  * Error codes
  */
 
 #define TWI_BUFF_OVERFLOW 0xBF
 #define TWI_BUFF_EMPTY 0xBE
+#define TWI_TASK_ERR 0xEE
 
-
-typedef	uint16_t twihdl_t;
 int8_t twi_init();
-void twi_send(uint8_t sla, uint8_t *data, uint8_t size);
 
 /* Experimental section */
 
 #include <string.h>
 
-typedef void twi_onaction_t();
-enum action { SR, SLA_R, SLA_W, DT_1, DR_N, DT_N, ON_ACT };
-enum mode { MASTER, SLAVE };
+typedef void (*twi_onaction_t)();
 
-void twi_startaction(enum action task[], uint8_t len);
+enum twi_action { SR, SLA_R, SLA_W, DT_1, DR_1, DR_N, DT_N, ON_ACT };
+enum twi_mode { MT, MR };
+
+void twi_startaction(enum twi_action task[], uint8_t len);
 void twi_set_txbuff(uint8_t *buff, uint8_t len);
 void twi_set_rxbuff(uint8_t *buff, uint8_t len);
 void twi_set_on_action(twi_onaction_t handler);
 void twi_setsla(uint8_t sla);
-void twi_setmode(enum mode);
+//void twi_setmode(enum twi_mode);
 
 #endif /* TWI_COMPLETE_H_ */
