@@ -45,7 +45,7 @@ void twi_error(uint8_t code);
 #ifdef DEBUG
 void twi_status_print()
 {
-	USART_TransmitMsg("TWI:STATUS: ");
+	USART_TransmitMsg("TW:S:");
 	USART_TransmitHexNum(TW_STATUS);
 	USART_Transmit('\n');
 }
@@ -54,7 +54,7 @@ void twi_status_print()
 int8_t twi_init()
 {
 #ifdef DEBUG
-	USART_TransmitMsg("TWI Init\n");
+	USART_TransmitMsg("TW Init\n");
 #endif
 
 	clearmask(TWI_DDR, _BV(TWI_SCL) | _BV(TWI_SDA));
@@ -72,7 +72,7 @@ int8_t twi_init()
 void twi_error(uint8_t code)
 {
 #ifdef DEBUG
-	USART_TransmitMsg("TWI:ERROR! CODE:");
+	USART_TransmitMsg("TW:E!C:");
 	USART_TransmitHexNum(code);
 	USART_Transmit('\n');
 #endif
@@ -136,17 +136,17 @@ ISR(TWI_vect)
 	twi_status_print();
 #endif
 
+	if (curr_task[curr_act_num] == ON_ACT)
+	{
+		curr_act_num++;
+		on_act_handler();
+	}
+
 	if (curr_act_num >= curr_task_len)
 	{
 		curr_act_num = curr_task_len = 0;
 		twi_transmit_stop();
 		return;
-	}
-
-	if (curr_task[curr_act_num] == ON_ACT)
-	{
-		curr_act_num++;
-		on_act_handler();
 	}
 
 	switch(TW_STATUS)
@@ -179,7 +179,7 @@ ISR(TWI_vect)
 						break;
 					case DT_N:
 							twi_transmit_data(tx_buff[tx_wr++]);
-							if (tx_wr == tx_buff_size)
+							if (tx_wr >= tx_buff_size)
 								curr_act_num++;
 						break;
 				}
@@ -241,6 +241,9 @@ ISR(TWI_vect)
 
 		/* Bus was broken? FUCK! */
 		case TW_BUS_ERROR:
+				curr_act_num = curr_task_len = 0;
+				twi_transmit_stop();
+				twi_error(TW_BUS_ERROR);
 			break;
 	}
 }
