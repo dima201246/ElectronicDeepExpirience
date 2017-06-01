@@ -27,6 +27,7 @@
  * Error codes
  */
 
+#define TWI_BUSY 0xBA
 #define TWI_BUFF_OVERFLOW 0xBF
 #define TWI_BUFF_EMPTY 0xBE
 #define TWI_TASK_ERR 0xEE
@@ -42,7 +43,9 @@ typedef void (*twi_onaction_t)();
 enum twi_action { SR, SLA_R, SLA_W, DT_1, DR_1, DR_N, DT_N, ON_ACT };
 enum twi_mode { MT, MR };
 
-void twi_startaction(enum twi_action task[], uint8_t len);
+uint8_t twi_startaction(enum twi_action task[], uint8_t len);
+void twi_actionwait();
+uint8_t twi_is_busy();
 void twi_set_txbuff(uint8_t *buff, uint8_t len);
 void twi_set_rxbuff(uint8_t *buff, uint8_t len);
 void twi_set_on_action(twi_onaction_t handler);

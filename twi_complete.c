@@ -5,9 +5,14 @@
  *      Author: viktor96
  */
 
-#define DEBUG
+//define DEBUG
 
 #include "twi_complete.h"
+
+#define true (1)
+#define false (0)
+
+uint8_t bus_is_busy = false;
 
 /* error handler */
 void twi_error(uint8_t code);
@@ -15,11 +20,11 @@ void twi_error(uint8_t code);
 
 // transmit start condition
 #define twi_transmit_start() \
-	do {setmask(TWCR, _BV(TWINT) | _BV(TWSTA) | _BV(TWEN));}while(0)\
+	do {setmask(TWCR, _BV(TWINT) | _BV(TWSTA) | _BV(TWEN)); bus_is_busy = true;}while(0)\
 
 // transmit stop condition
 #define twi_transmit_stop() \
-	do {setmask(TWCR, _BV(TWINT) | _BV(TWSTO) | _BV(TWEN));}while(0)\
+	do {setmask(TWCR, _BV(TWINT) | _BV(TWSTO) | _BV(TWEN)); bus_is_busy = false;}while(0)\
 
 #define twi_transmit_data(_data) \
 	do {\
@@ -60,8 +65,8 @@ int8_t twi_init()
 	clearmask(TWI_DDR, _BV(TWI_SCL) | _BV(TWI_SDA));
 	setmask(TWI_PORT, _BV(TWI_SCL) | _BV(TWI_SDA));  // enable pull-up resistors
 
-	//TWBR = 72; 	// 100 KHz
-	TWBR = 250;	// DEBUG
+	TWBR = 72; 	// 100 KHz
+
 	TWSR = 0;
 
 	setbit(TWCR, TWIE);		// enable interrupts
@@ -71,6 +76,7 @@ int8_t twi_init()
 
 void twi_error(uint8_t code)
 {
+	bus_is_busy = false;
 #ifdef DEBUG
 	USART_TransmitMsg("TW:E!C:");
 	USART_TransmitHexNum(code);
@@ -96,8 +102,11 @@ void do_nothing()
 
 twi_onaction_t on_act_handler = do_nothing;
 
-void twi_startaction(enum twi_action task[], uint8_t len)
+uint8_t twi_startaction(enum twi_action task[], uint8_t len)
 {
+	if (twi_is_busy())
+		return TWI_BUSY;
+
 	curr_task_len = len;
 	memcpy(curr_task, task, len);
 
@@ -105,6 +114,19 @@ void twi_startaction(enum twi_action task[], uint8_t len)
 	tx_wr = rx_wr = 0;
 
 	twi_transmit_start();
+
+	return 0;
+}
+
+uint8_t twi_is_busy()
+{
+	return bus_is_busy;
+}
+
+void twi_actionwait()
+{
+	while(twi_is_busy())
+		_delay_us(1);
 }
 
 void twi_set_txbuff(uint8_t *buff, uint8_t len)

@@ -97,12 +97,10 @@ void USART_TransmitHexNum(uint16_t num)
 			'C', 'D', 'E', 'F'
 	};
 
-	char msg[7] = { '0', 'x', [6] = '\0' };
+	char msg[5] = { '0', 'x', [4] = '\0' };
 
-	msg[2] = num_to_hex_char [(num >> 12) & 0x0F];
-	msg[3] = num_to_hex_char [(num >> 8) & 0x0F];
-	msg[4] = num_to_hex_char [(num >> 4) & 0x0F];
-	msg[5] = num_to_hex_char [num & 0x0F];
+	msg[2] = num_to_hex_char [(num >> 4) & 0x0F];
+	msg[3] = num_to_hex_char [num & 0x0F];
 
 	char *p = msg;
 	for(; *p; ++p)
