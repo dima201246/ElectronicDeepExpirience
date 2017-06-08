@@ -71,12 +71,6 @@ uint8_t clock_send_wait(uint8_t *data, uint8_t size)
 	return status;
 }
 
-uint8_t goforward = true;
-void cont()
-{
-	goforward = true;
-}
-
 int main()
 {
 
@@ -96,6 +90,6 @@ int main()
 	{
 		//twi_send(CLOCK_SLA, data, 4);
 		clock_recv(clock_reg, sizeof(clock_reg), read_buff);
-		_delay_ms(10);
+		_delay_ms(100);
 	}
 }
