@@ -36,6 +36,20 @@ void twi_error(uint8_t code);
 		setmask(TWCR, _BV(TWEN) | _BV(TWINT));\
 	} while(0)\
 
+#define twi_st_transmit_data_ack(_data) \
+	do {\
+		TWDR = (_data);\
+		clearmask(TWCR, _BV(TWSTO));\
+		setmask(TWCR, _BV(TWINT) | _BV(TWEA));\
+	} while(0)\
+
+#define twi_st_transmit_data_nack(_data) \
+	do {\
+		TWDR = (_data);\
+		clearmask(TWCR, _BV(TWSTO) | _BV(TWEA));\
+		setmask(TWCR, _BV(TWINT));\
+	} while(0)\
+
 #define twi_recv_ack(_to)\
 	do{\
 		(_to) = TWDR;\
@@ -300,6 +314,20 @@ ISR(TWI_vect)
 				default:
 					twi_transmit_stop();
 					break;
+			}
+			break;
+
+
+		/*--------------- SLAVE TRANSIVER MODE ---------------*/
+
+		case TW_ST_SLA_ACK:
+			if (tx_rd == tx_buff_size-1)
+			{
+				twi_st_transmit_data_nack(tx_buff[tx_rd++]);
+			}
+			else
+			{
+				twi_st_transmit_data_ack(tx_buff[tx_rd++]);
 			}
 			break;
 
