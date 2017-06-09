@@ -8,7 +8,7 @@
 #ifndef USART_H_
 #define USART_H_
 
-#define UART_RATE		9600
+#define UART_RATE		19200
 #define UART_BUFSIZE	256
 #define UART_BUFEND		(UART_BUFSIZE-1)
 

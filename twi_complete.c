@@ -5,9 +5,12 @@
  *      Author: viktor96
  */
 
-//define DEBUG
+#define DEBUG
 
+#include <avr/eeprom.h>
 #include "twi_complete.h"
+
+#define ERRP_ADDR 0x00
 
 #define true (1)
 #define false (0)
@@ -56,7 +59,7 @@ void twi_status_print()
 }
 #endif
 
-int8_t twi_init()
+int8_t twi_init(uint16_t freq)
 {
 #ifdef DEBUG
 	USART_TransmitMsg("TW Init\n");
@@ -65,7 +68,8 @@ int8_t twi_init()
 	clearmask(TWI_DDR, _BV(TWI_SCL) | _BV(TWI_SDA));
 	setmask(TWI_PORT, _BV(TWI_SCL) | _BV(TWI_SDA));  // enable pull-up resistors
 
-	TWBR = 72; 	// 100 KHz
+	/* SCL frequency = F_CPU / (16 + 2*(TWBR)*(PrescalerValue)) */
+	TWBR = (uint8_t) ((((F_CPU/1000)/(freq))-16) >> 1);
 
 	TWSR = 0;
 
@@ -77,6 +81,14 @@ int8_t twi_init()
 void twi_error(uint8_t code)
 {
 	bus_is_busy = false;
+
+	uint8_t err_addr = eeprom_read_byte(ERRP_ADDR);
+
+	eeprom_write_byte(err_addr, code);
+	err_addr = (err_addr == 256) ? 1 : err_addr + 1;
+
+	eeprom_write_byte(ERRP_ADDR, err_addr);
+
 #ifdef DEBUG
 	USART_TransmitMsg("TW:E!C:");
 	USART_TransmitHexNum(code);
@@ -89,7 +101,7 @@ void twi_error(uint8_t code)
 uint8_t *tx_buff, tx_buff_size;
 uint8_t *rx_buff, rx_buff_size;
 
-uint8_t tx_wr, rx_wr;
+uint8_t tx_rd, rx_wr;
 
 uint8_t curr_task[16], curr_act_num, curr_task_len;
 
@@ -111,7 +123,7 @@ uint8_t twi_startaction(enum twi_action task[], uint8_t len)
 	memcpy(curr_task, task, len);
 
 	curr_act_num = 0;
-	tx_wr = rx_wr = 0;
+	tx_rd = rx_wr = 0;
 
 	twi_transmit_start();
 
@@ -146,9 +158,29 @@ void twi_set_on_action(twi_onaction_t handler)
 	on_act_handler = handler;
 }
 
+void twi_setown_addr(uint8_t own_a)
+{
+	TWAR = own_a << 1;
+}
+
 void twi_setsla(uint8_t sla)
 {
 	slave_address = sla << 1;
+}
+
+void twi_setmode(enum twi_mode mode)
+{
+	switch(mode)
+	{
+	case MASTER:
+		clearbit(TWCR, TWEA);
+		break;
+	case SLAVE:
+		clearmask(TWCR, _BV(TWINT) | _BV(TWSTA) |
+						_BV(TWSTO) | _BV(TWWC));
+		setmask(TWCR, _BV(TWEA) | _BV(TWEN));
+		break;
+	}
 }
 
 // Main TWI interrupt handler
@@ -196,20 +228,25 @@ ISR(TWI_vect)
 							twi_transmit_start();
 						break;
 					case DT_1:
-							twi_transmit_data(tx_buff[tx_wr++]);
+							twi_transmit_data(tx_buff[tx_rd++]);
 							curr_act_num++;
 						break;
 					case DT_N:
-							twi_transmit_data(tx_buff[tx_wr++]);
-							if (tx_wr >= tx_buff_size)
+							twi_transmit_data(tx_buff[tx_rd++]);
+							if (tx_rd >= tx_buff_size)
 								curr_act_num++;
+						break;
+
+					default:
+						curr_act_num++;
 						break;
 				}
 			break;
 
 		/* Something is wrong */
+		case TW_MT_SLA_NACK:
 		case TW_MT_DATA_NACK:
-			twi_error(TW_MT_DATA_NACK);
+			twi_error(TW_STATUS);
 			curr_act_num = curr_task_len = 0;
 			twi_transmit_stop();
 			break;
@@ -249,9 +286,14 @@ ISR(TWI_vect)
 						twi_recv_ack(rx_buff[rx_wr++]);
 					}
 					break;
+
+				default:
+					curr_act_num++;
+					break;
 			}
 			break;
 
+		case TW_MR_SLA_NACK:
 		case TW_MR_DATA_NACK:
 			switch(curr_task[curr_act_num])
 			{
@@ -269,18 +311,3 @@ ISR(TWI_vect)
 			break;
 	}
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

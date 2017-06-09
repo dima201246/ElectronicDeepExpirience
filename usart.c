@@ -7,6 +7,7 @@
 #include "usart.h"
 #include <avr/io.h>
 #include <util/delay.h>
+#include <util/atomic.h>
 #include <avr/interrupt.h>
 
 uint8_t uart_rxrd, uart_rxwr;
@@ -52,7 +53,7 @@ uint8_t USART_RX_Count()
 void USART_Init( uint16_t bauds )
 {
 	/* Set baud rate */
-	uint16_t baudrate = (F_CPU/16/bauds) - 1;
+	uint16_t baudrate = ((F_CPU/16)/bauds) - 1;
 	UBRR0H = (uint8_t)(baudrate >> 8);
 	UBRR0L = (uint8_t) baudrate;
 	/* Enable receiver and transmitter */
@@ -63,27 +64,36 @@ void USART_Init( uint16_t bauds )
 
 uint8_t USART_Recive()
 {
-	uint8_t rd = uart_rxrd;
-	uint8_t byte;
-	if(rd != uart_rxwr)
-	{
-		byte = uart_rx[rd];
-		uart_rxrd = (rd+1) & UART_BUFEND;
-		return byte;
-	}
+	uint8_t rd;
 
+	ATOMIC_BLOCK(ATOMIC_RESTORESTATE)
+	{
+		rd = uart_rxrd;
+		uint8_t byte;
+		if(rd != uart_rxwr)
+		{
+			byte = uart_rx[rd];
+			uart_rxrd = (rd+1) & UART_BUFEND;
+			return byte;
+		}
+	}
 	return 0;
 }
 
 void USART_Transmit( uint8_t byte )
 {
-	uint8_t wr = (uart_txwr+1) & UART_BUFEND;
-	if(wr != uart_txrd)
+	uint8_t wr;
+
+	ATOMIC_BLOCK(ATOMIC_RESTORESTATE)
 	{
-		uart_tx[uart_txwr] = byte;
-		uart_txwr = wr;
-		/* Разрешаем прерывание по опустошению буфера */
-		setbit(UCSR0B, UDRIE0);
+		wr = (uart_txwr+1) & UART_BUFEND;
+		if(wr != uart_txrd)
+		{
+			uart_tx[uart_txwr] = byte;
+			uart_txwr = wr;
+			/* Разрешаем прерывание по опустошению буфера */
+			setbit(UCSR0B, UDRIE0);
+		}
 	}
 }
 

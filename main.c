@@ -75,7 +75,7 @@ int main()
 {
 
     USART_Setup();
-    twi_init();
+    twi_init(100);
 
     sei();
 
@@ -90,6 +90,7 @@ int main()
 	{
 		//twi_send(CLOCK_SLA, data, 4);
 		clock_recv(clock_reg, sizeof(clock_reg), read_buff);
-		_delay_ms(100);
+		USART_TransmitMsg("\n_____\n");
+		_delay_ms(300);
 	}
 }
